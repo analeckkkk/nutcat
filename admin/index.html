@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админка магазина</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h2>Вход в админку</h2>
+    <input type="password" id="passwordInput" placeholder="Пароль">
+    <button id="loginBtn">Войти</button>
+    <div id="loginError" class="error"></div>
+  </div>
+</div>
+
+<div id="adminScreen" class="admin-screen" style="display:none;">
+  <div class="sidebar">
+    <div class="logo">Админка</div>
+    <button class="tabbtn active" data-tab="orders">📋 Заказы</button>
+    <button class="tabbtn" data-tab="products">🧴 Товары</button>
+    <button class="tabbtn" data-tab="locations">🏪 Точки</button>
+    <button class="tabbtn" data-tab="stock">📦 Остатки</button>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
