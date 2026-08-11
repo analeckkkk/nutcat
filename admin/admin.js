@@ -11,20 +11,25 @@ async function api(path, opts = {}) {
 }
 
 document.getElementById('loginBtn').onclick = async () => {
-  const pass = document.getElementById('passwordInput').value;
-  const res = await fetch('/api/admin/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: pass }),
-  });
-  if (res.ok) {
-    adminPassword = pass;
-    sessionStorage.setItem('adminPassword', pass);
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminScreen').style.display = 'flex';
-    switchTab('orders');
-  } else {
-    document.getElementById('loginError').textContent = 'Неверный пароль';
+  try {
+    const pass = document.getElementById('passwordInput').value;
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass }),
+    });
+    if (res.ok) {
+      adminPassword = pass;
+      sessionStorage.setItem('adminPassword', pass);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminScreen').style.display = 'flex';
+      switchTab('orders');
+    } else {
+      document.getElementById('loginError').textContent = 'Неверный пароль (код ' + res.status + ')';
+    }
+  } catch (err) {
+    alert('ОШИБКА ВХОДА: ' + err.message);
+    document.getElementById('loginError').textContent = 'Ошибка: ' + err.message;
   }
 };
 
@@ -169,4 +174,50 @@ async function renderLocations() {
           <td>${l.name}</td>
           <td>${l.address || ''}</td>
           <td>${l.is_open ? 'Открыт' : 'Закрыт'}</td>
-          <td>
+          <td><button class="small danger" data-id="${l.id}">Удалить</button></td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+  table.querySelectorAll('button.danger').forEach(btn => {
+    btn.onclick = async () => { await api(`/admin/locations/${btn.dataset.id}`, { method: 'DELETE' }); renderLocations(); };
+  });
+}
+
+async function renderStock() {
+  const content = document.getElementById('content');
+  content.innerHTML = `<h2>Остатки по точкам</h2><div id="stockForm"></div><div id="stockTable">Загрузка...</div>`;
+
+  const [products, locations, stock] = await Promise.all([
+    api('/admin/products'), api('/admin/locations'), api('/admin/stock'),
+  ]);
+
+  const form = document.getElementById('stockForm');
+  form.innerHTML = `
+    <div class="form-row">
+      <select id="s_product">${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+      <select id="s_location">${locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}</select>
+      <input id="s_qty" type="number" placeholder="Количество">
+      <button class="small" id="setStockBtn">Сохранить остаток</button>
+    </div>
+  `;
+  document.getElementById('setStockBtn').onclick = async () => {
+    await api('/admin/stock', {
+      method: 'PUT',
+      body: JSON.stringify({
+        product_id: document.getElementById('s_product').value,
+        location_id: document.getElementById('s_location').value,
+        quantity: parseInt(document.getElementById('s_qty').value, 10) || 0,
+      }),
+    });
+    renderStock();
+  };
+
+  const table = document.getElementById('stockTable');
+  table.innerHTML = `
+    <table>
+      <tr><th>Товар</th><th>Точка</th><th>Количество</th></tr>
+      ${stock.map(s => `<tr><td>${s.product_name}</td><td>${s.location_name}</td><td>${s.quantity}</td></tr>`).join('')}
+    </table>
+  `;
+}
