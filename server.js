@@ -37,7 +37,6 @@ app.get('/api/banners', (req, res) => {
   res.json(db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id ASC').all());
 });
 
-// Список линеек (для категории или всех), с обложкой (картинка линейки или первого товара в ней)
 app.get('/api/lines', (req, res) => {
   const { category } = req.query;
   let lines = category
@@ -52,7 +51,6 @@ app.get('/api/lines', (req, res) => {
   res.json(lines);
 });
 
-// Товары: ?location_id=, ?category=, ?line_id= (число, или "none" — товары без линейки)
 app.get('/api/products', (req, res) => {
   const { location_id, category, line_id } = req.query;
   let products = db.prepare('SELECT * FROM products WHERE is_active = 1 ORDER BY id DESC').all();
@@ -85,6 +83,18 @@ app.get('/api/products/:id/availability', (req, res) => {
     ORDER BY s.quantity DESC
   `).all(req.params.id);
   res.json(rows);
+});
+
+// Уведомление при добавлении товара в корзину (до оформления заказа)
+app.post('/api/cart-interest', async (req, res) => {
+  const { telegram_user_id, telegram_username, product_id, product_name, qty } = req.body;
+  const msg =
+    `👀 <b>Товар добавлен в корзину</b>\n` +
+    (telegram_username ? `От: @${telegram_username}\n` : (telegram_user_id ? `ID: ${telegram_user_id}\n` : '')) +
+    `Товар: ${product_name}\n` +
+    `Количество в корзине: ${qty}`;
+  await notifyAdmin(msg);
+  res.json({ ok: true });
 });
 
 app.post('/api/orders', async (req, res) => {
@@ -147,7 +157,6 @@ app.post('/api/admin/login', (req, res) => {
 
 app.use('/api/admin', adminAuth);
 
-// Точки
 app.get('/api/admin/locations', (req, res) => {
   res.json(db.prepare('SELECT * FROM locations ORDER BY id').all());
 });
@@ -168,7 +177,6 @@ app.delete('/api/admin/locations/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Линейки
 app.get('/api/admin/lines', (req, res) => {
   res.json(db.prepare('SELECT * FROM lines ORDER BY id DESC').all());
 });
@@ -183,7 +191,6 @@ app.delete('/api/admin/lines/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Товары
 app.get('/api/admin/products', (req, res) => {
   const products = db.prepare('SELECT * FROM products ORDER BY id DESC').all();
   const lines = db.prepare('SELECT id, name FROM lines').all();
@@ -211,7 +218,6 @@ app.delete('/api/admin/products/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Остатки
 app.put('/api/admin/stock', (req, res) => {
   const { product_id, location_id, quantity } = req.body;
   db.prepare(`
@@ -229,7 +235,6 @@ app.get('/api/admin/stock', (req, res) => {
   `).all());
 });
 
-// Баннеры
 app.get('/api/admin/banners', (req, res) => {
   res.json(db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id ASC').all());
 });
@@ -244,7 +249,6 @@ app.delete('/api/admin/banners/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Заказы
 app.get('/api/admin/orders', (req, res) => {
   const rows = db.prepare('SELECT * FROM orders ORDER BY id DESC').all();
   res.json(rows.map(r => ({ ...r, items: JSON.parse(r.items) })));
