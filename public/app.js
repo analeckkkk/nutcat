@@ -8,6 +8,8 @@ let state = {
   tab: 'shops',
   locations: [],
   selectedLocationId: null,
+  selectedCategory: null,
+  selectedLineId: null,
   products: [],
   cart: {},
 };
@@ -26,19 +28,34 @@ async function api(path, opts = {}) {
 function money(n) { return `${n} ₽`; }
 
 async function renderShops() {
-  const locations = await api('/locations');
+  const [locations, banners] = await Promise.all([api('/locations'), api('/banners')]);
   state.locations = locations;
 
   app.innerHTML = `
-    <div class="banner">
-      <div class="badge">⭐ ТОВАР ДНЯ</div>
-      <div class="name">Загляните в каталог</div>
-      <div class="price">Свежие поступления каждую неделю</div>
-    </div>
+    <div class="banner-carousel" id="bannerCarousel"></div>
     <div class="section-title">Наши магазины</div>
     <div id="shopList"></div>
     <button class="btn-outline" id="openCatalogBtn">Открыть общий каталог</button>
   `;
+
+  const carousel = document.getElementById('bannerCarousel');
+  if (banners.length === 0) {
+    carousel.innerHTML = `
+      <div class="banner">
+        <div class="badge">⭐ ТОВАР ДНЯ</div>
+        <div class="name">Загляните в каталог</div>
+        <div class="price">Свежие поступления каждую неделю</div>
+      </div>
+    `;
+  } else {
+    carousel.innerHTML = banners.map(b => `
+      <div class="banner">
+        ${b.badge ? `<div class="badge">${b.badge}</div>` : ''}
+        <div class="name">${b.title}</div>
+        <div class="price">${b.subtitle || ''}</div>
+      </div>
+    `).join('');
+  }
 
   const list = document.getElementById('shopList');
   locations.forEach(loc => {
@@ -63,9 +80,13 @@ async function renderShops() {
 }
 
 async function renderCatalog() {
+  state.selectedLineId = null;
   const qs = state.selectedLocationId ? `?location_id=${state.selectedLocationId}` : '';
-  const products = await api('/products' + qs);
-  state.products = products;
+  const allProducts = await api('/products' + qs);
+  const lines = await api('/lines');
+
+  const categories = [...new Set(allProducts.map(p => p.category))];
+  if (!state.selectedCategory && categories.length) state.selectedCategory = categories[0];
 
   const locName = state.selectedLocationId
     ? state.locations.find(l => l.id === state.selectedLocationId)?.name
@@ -74,10 +95,61 @@ async function renderCatalog() {
   app.innerHTML = `
     <h1 class="page-title">Каталог</h1>
     <div class="chip">📍 ${locName}</div>
+    <div id="catTabs" style="margin:12px 0; display:flex; gap:8px; overflow-x:auto;"></div>
+    <div id="linesRow"></div>
     <div id="productList" style="margin-top:14px;"></div>
   `;
 
-  const list = document.getElementById('productList');
+  const catTabs = document.getElementById('catTabs');
+  categories.forEach(cat => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.style.cursor = 'pointer';
+    b.style.border = cat === state.selectedCategory ? '1px solid #a488ff' : 'none';
+    b.textContent = cat;
+    b.onclick = () => { state.selectedCategory = cat; renderCatalog(); };
+    catTabs.appendChild(b);
+  });
+
+  const catLines = lines.filter(l => l.category === state.selectedCategory);
+  const linesRow = document.getElementById('linesRow');
+  if (catLines.length > 0) {
+    linesRow.innerHTML = catLines.map(l => `
+      <div class="line-card" data-line="${l.id}">
+        <div class="line-thumb"></div>
+        <div class="line-name">${l.name}</div>
+        <div class="line-cta">Смотреть вкусы →</div>
+      </div>
+    `).join('');
+    linesRow.querySelectorAll('.line-card').forEach(card => {
+      card.onclick = () => { state.selectedLineId = Number(card.dataset.line); renderLineProducts(); };
+    });
+  } else {
+    linesRow.innerHTML = '';
+  }
+
+  const directProducts = allProducts.filter(p => p.category === state.selectedCategory && !p.line_id);
+  state.products = allProducts;
+  renderProductList(directProducts, 'productList');
+}
+
+async function renderLineProducts() {
+  const qs = state.selectedLocationId ? `&location_id=${state.selectedLocationId}` : '';
+  const line = (await api('/lines')).find(l => l.id === state.selectedLineId);
+  const products = await api(`/products?line_id=${state.selectedLineId}${qs}`);
+  state.products = [...state.products, ...products];
+
+  app.innerHTML = `
+    <button class="btn-outline" id="backBtn" style="width:auto;padding:8px 14px;font-size:13px;margin-bottom:12px;">← Назад</button>
+    <h1 class="page-title">${line ? line.name : 'Линейка'}</h1>
+    <div id="productList"></div>
+  `;
+  document.getElementById('backBtn').onclick = () => { state.selectedLineId = null; renderCatalog(); };
+  renderProductList(products, 'productList');
+}
+
+function renderProductList(products, containerId) {
+  const list = document.getElementById(containerId);
   if (products.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="emoji">📦</div>Товаров пока нет</div>`;
     return;
@@ -145,9 +217,7 @@ async function renderCart() {
     return;
   }
 
-  if (state.products.length === 0) {
-    state.products = await api('/products');
-  }
+  if (state.products.length === 0) state.products = await api('/products');
 
   let total = 0;
   const rowsHtml = ids.map(id => {
@@ -171,7 +241,6 @@ async function renderCart() {
     </div>
     <button class="btn-primary" id="checkoutBtn">Оформить заказ</button>
   `;
-
   document.getElementById('checkoutBtn').onclick = checkout;
 }
 
