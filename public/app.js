@@ -190,6 +190,19 @@ function changeQty(product, delta) {
   else state.cart[product.id] = next;
   const span = document.getElementById(`qty-${product.id}`);
   if (span) span.textContent = state.cart[product.id] || 0;
+
+  if (delta > 0) {
+    api('/cart-interest', {
+      method: 'POST',
+      body: JSON.stringify({
+        telegram_user_id: tgUser?.id ? String(tgUser.id) : null,
+        telegram_username: tgUser?.username || null,
+        product_id: product.id,
+        product_name: product.name,
+        qty: state.cart[product.id],
+      }),
+    }).catch(() => {});
+  }
 }
 
 async function showAvailability(product) {
@@ -283,7 +296,7 @@ async function renderOrders() {
     div.className = 'card';
     div.innerHTML = `
       <div class="order-status">● ${o.status === 'new' ? 'Новый' : o.status}</div>
-      <div style="font-weight:800;font-size:18px;margin:8px 0 4px;">Заказ #${o.id}</div>
+      <div style="font-weight:800;font-size:18px;margin:8px 0 4px;color:#38d67b;">Заказ #${o.id}</div>
       <div style="color:#9c93b5;font-size:13px;">${o.items.length} позиц. · ${o.items.reduce((a,i)=>a+i.qty,0)} шт</div>
       <div style="margin-top:8px;font-weight:700;">${money(o.total)}</div>
     `;
