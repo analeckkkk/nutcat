@@ -14,10 +14,7 @@ app.use('/', express.static(path.join(__dirname, 'public')));
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
 async function notifyAdmin(text) {
-  if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
-    console.warn('BOT_TOKEN или ADMIN_CHAT_ID не заданы — уведомление не отправлено.');
-    return;
-  }
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID) return;
   try {
     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -30,14 +27,43 @@ async function notifyAdmin(text) {
   }
 }
 
+// ---------- ПУБЛИЧНОЕ API ----------
+
 app.get('/api/locations', (req, res) => {
   res.json(db.prepare('SELECT * FROM locations ORDER BY id').all());
 });
 
+app.get('/api/banners', (req, res) => {
+  res.json(db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id ASC').all());
+});
+
+// Список линеек (для категории или всех), с обложкой (картинка линейки или первого товара в ней)
+app.get('/api/lines', (req, res) => {
+  const { category } = req.query;
+  let lines = category
+    ? db.prepare('SELECT * FROM lines WHERE category = ? ORDER BY id').all(category)
+    : db.prepare('SELECT * FROM lines ORDER BY id').all();
+
+  const coverStmt = db.prepare('SELECT image_url FROM products WHERE line_id = ? AND image_url != \'\' LIMIT 1');
+  lines = lines.map(l => {
+    const cover = l.image_url || coverStmt.get(l.id)?.image_url || '';
+    return { ...l, cover_image: cover };
+  });
+  res.json(lines);
+});
+
+// Товары: ?location_id=, ?category=, ?line_id= (число, или "none" — товары без линейки)
 app.get('/api/products', (req, res) => {
-  const { location_id, category } = req.query;
+  const { location_id, category, line_id } = req.query;
   let products = db.prepare('SELECT * FROM products WHERE is_active = 1 ORDER BY id DESC').all();
+
   if (category) products = products.filter(p => p.category === category);
+
+  if (line_id === 'none') {
+    products = products.filter(p => !p.line_id);
+  } else if (line_id) {
+    products = products.filter(p => p.line_id === Number(line_id));
+  }
 
   const stockStmt = location_id
     ? db.prepare('SELECT quantity FROM stock WHERE product_id = ? AND location_id = ?')
@@ -47,6 +73,7 @@ app.get('/api/products', (req, res) => {
     const row = location_id ? stockStmt.get(p.id, location_id) : stockStmt.get(p.id);
     return { ...p, quantity: row?.quantity || 0 };
   });
+
   res.json(withStock);
 });
 
@@ -105,6 +132,8 @@ app.get('/api/orders', (req, res) => {
   res.json(rows.map(r => ({ ...r, items: JSON.parse(r.items) })));
 });
 
+// ---------- АДМИН API ----------
+
 function adminAuth(req, res, next) {
   const pass = req.header('x-admin-password');
   if (pass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Неверный пароль' });
@@ -118,6 +147,7 @@ app.post('/api/admin/login', (req, res) => {
 
 app.use('/api/admin', adminAuth);
 
+// Точки
 app.get('/api/admin/locations', (req, res) => {
   res.json(db.prepare('SELECT * FROM locations ORDER BY id').all());
 });
@@ -138,23 +168,42 @@ app.delete('/api/admin/locations/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Линейки
+app.get('/api/admin/lines', (req, res) => {
+  res.json(db.prepare('SELECT * FROM lines ORDER BY id DESC').all());
+});
+app.post('/api/admin/lines', (req, res) => {
+  const { category, name, image_url } = req.body;
+  const r = db.prepare('INSERT INTO lines (category, name, image_url) VALUES (?, ?, ?)')
+    .run(category || 'Прочее', name, image_url || '');
+  res.json({ id: r.lastInsertRowid });
+});
+app.delete('/api/admin/lines/:id', (req, res) => {
+  db.prepare('DELETE FROM lines WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Товары
 app.get('/api/admin/products', (req, res) => {
-  res.json(db.prepare('SELECT * FROM products ORDER BY id DESC').all());
+  const products = db.prepare('SELECT * FROM products ORDER BY id DESC').all();
+  const lines = db.prepare('SELECT id, name FROM lines').all();
+  const lineMap = Object.fromEntries(lines.map(l => [l.id, l.name]));
+  res.json(products.map(p => ({ ...p, line_name: p.line_id ? lineMap[p.line_id] || '' : '' })));
 });
 app.post('/api/admin/products', (req, res) => {
-  const { name, description, price, image_url, category, is_new, is_promo } = req.body;
+  const { name, description, price, image_url, category, line_id, is_new, is_promo } = req.body;
   const r = db.prepare(`
-    INSERT INTO products (name, description, price, image_url, category, is_new, is_promo)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(name, description || '', price, image_url || '', category || 'Прочее', is_new ? 1 : 0, is_promo ? 1 : 0);
+    INSERT INTO products (name, description, price, image_url, category, line_id, is_new, is_promo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, description || '', price, image_url || '', category || 'Прочее', line_id || null, is_new ? 1 : 0, is_promo ? 1 : 0);
   res.json({ id: r.lastInsertRowid });
 });
 app.put('/api/admin/products/:id', (req, res) => {
-  const { name, description, price, image_url, category, is_new, is_promo, is_active } = req.body;
+  const { name, description, price, image_url, category, line_id, is_new, is_promo, is_active } = req.body;
   db.prepare(`
-    UPDATE products SET name=?, description=?, price=?, image_url=?, category=?, is_new=?, is_promo=?, is_active=?
+    UPDATE products SET name=?, description=?, price=?, image_url=?, category=?, line_id=?, is_new=?, is_promo=?, is_active=?
     WHERE id=?
-  `).run(name, description || '', price, image_url || '', category || 'Прочее', is_new ? 1 : 0, is_promo ? 1 : 0, is_active === false ? 0 : 1, req.params.id);
+  `).run(name, description || '', price, image_url || '', category || 'Прочее', line_id || null, is_new ? 1 : 0, is_promo ? 1 : 0, is_active === false ? 0 : 1, req.params.id);
   res.json({ ok: true });
 });
 app.delete('/api/admin/products/:id', (req, res) => {
@@ -162,6 +211,7 @@ app.delete('/api/admin/products/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Остатки
 app.put('/api/admin/stock', (req, res) => {
   const { product_id, location_id, quantity } = req.body;
   db.prepare(`
@@ -179,6 +229,22 @@ app.get('/api/admin/stock', (req, res) => {
   `).all());
 });
 
+// Баннеры
+app.get('/api/admin/banners', (req, res) => {
+  res.json(db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id ASC').all());
+});
+app.post('/api/admin/banners', (req, res) => {
+  const { badge, title, subtitle, image_url, sort_order } = req.body;
+  const r = db.prepare('INSERT INTO banners (badge, title, subtitle, image_url, sort_order) VALUES (?, ?, ?, ?, ?)')
+    .run(badge || '', title, subtitle || '', image_url || '', sort_order || 0);
+  res.json({ id: r.lastInsertRowid });
+});
+app.delete('/api/admin/banners/:id', (req, res) => {
+  db.prepare('DELETE FROM banners WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Заказы
 app.get('/api/admin/orders', (req, res) => {
   const rows = db.prepare('SELECT * FROM orders ORDER BY id DESC').all();
   res.json(rows.map(r => ({ ...r, items: JSON.parse(r.items) })));
