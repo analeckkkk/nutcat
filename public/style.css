@@ -1,145 +1,32 @@
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: #0d0a17;
-  color: #f2eefc;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  padding-bottom: 76px;
-}
-.topbar {
-  padding: 14px 16px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 17px;
-  background: #0d0a17;
-  border-bottom: 1px solid #221c33;
-}
-#app { padding: 16px; }
-
-h1.page-title { font-size: 26px; font-weight: 800; margin: 4px 0 16px; }
-
-.card {
-  background: #171226;
-  border: 1px solid #241d38;
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.banner {
-  border-radius: 16px;
-  overflow: hidden;
-  position: relative;
-  height: 200px;
-  background: linear-gradient(160deg,#3a2f57,#171226);
-  margin-bottom: 12px;
-  padding: 14px;
+.banner-carousel {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 12px;
+  margin-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
 }
-.banner .badge {
-  align-self: flex-start;
-  background: rgba(0,0,0,0.35);
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  margin-bottom: 8px;
+.banner-carousel .banner {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  margin-bottom: 0;
 }
-.banner .name { font-weight: 800; font-size: 18px; }
-.banner .price { font-weight: 700; color: #b79bff; }
-
-.section-title { font-size: 20px; font-weight: 800; margin: 20px 0 10px; }
-
-.shop-row {
+.line-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: #171226;
-  border: 1px solid #241d38;
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-.shop-row .dot { color: #38d67b; font-size: 12px; }
-.shop-row .shop-name { font-weight: 700; font-size: 16px; }
-.shop-row .status { font-size: 13px; color: #9c93b5; }
-
-.btn-outline {
-  width: 100%;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid #6a4bd6;
-  color: #a488ff;
-  background: transparent;
-  font-weight: 700;
-  font-size: 15px;
-}
-.btn-primary {
-  width: 100%;
-  padding: 14px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(90deg,#7b4bf0,#9a5bff);
-  color: white;
-  font-weight: 700;
-  font-size: 15px;
-}
-
-.product-card {
-  display: flex;
   gap: 12px;
   background: #171226;
   border: 1px solid #241d38;
   border-radius: 16px;
   padding: 12px;
   margin-bottom: 10px;
+  cursor: pointer;
 }
-.product-card img, .product-thumb {
-  width: 64px; height: 64px;
+.line-thumb {
+  width: 56px; height: 56px;
   border-radius: 12px;
-  background: #241d38;
+  background: linear-gradient(135deg,#3a2f57,#171226);
   flex-shrink: 0;
-  object-fit: cover;
 }
-.product-info { flex: 1; }
-.product-name { font-weight: 700; font-size: 15px; }
-.product-desc { font-size: 12px; color: #9c93b5; margin: 2px 0 6px; }
-.product-price { font-weight: 800; color: #d7c8ff; }
-.stock-tag { font-size: 11px; color: #38d67b; margin-left: 8px; }
-.stock-tag.out { color: #ff6b6b; }
-.qty-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.qty-btn {
-  width: 28px; height: 28px; border-radius: 8px;
-  border: 1px solid #3a2f57; background: #241d38; color: white;
-  font-size: 16px; line-height: 1;
-}
-.cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.empty-state { text-align: center; padding: 60px 20px; color: #9c93b5; }
-.empty-state .emoji { font-size: 40px; margin-bottom: 10px; }
-
-.bottomnav {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  display: flex; justify-content: space-around;
-  background: #120e1f;
-  border-top: 1px solid #221c33;
-  padding: 8px 0 20px;
-}
-.navbtn {
-  background: none; border: none; color: #7d7392;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  font-size: 11px;
-}
-.navbtn.active { color: #a488ff; }
-.navbtn span { font-weight: 600; }
-
-.chip {
-  display: inline-block; padding: 6px 12px; border-radius: 20px;
-  background: #241d38; color: #cbb8ff; font-size: 13px; margin-right: 8px;
-}
-.order-status {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: #241d38; color: #cbb8ff; padding: 4px 10px; border-radius: 20px; font-size: 12px;
-}
-.avail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #241d38; font-size: 14px; }
+.line-name { font-weight: 700; font-size: 15px; flex: 1; }
+.line-cta { font-size: 12px; color: #a488ff; }
